@@ -1,6 +1,8 @@
 """The history access service."""
 
+from collections import defaultdict
 import datetime
+import itertools
 import logging
 
 import voluptuous as vol
@@ -48,7 +50,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     def get_history_data(start_time, end_time, entity_ids):
         with session_scope(hass=hass, read_only=True) as session:
-            return history.get_significant_states_with_session(
+            data = history.get_significant_states_with_session(
                 hass=hass,
                 session=session,
                 start_time=start_time,
@@ -61,6 +63,20 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 no_attributes=True,
                 significant_changes_only=True,
             )
+
+            resultList = defaultdict()
+
+            for key, value in data.items():
+                resultList[key] = defaultdict()
+                for k, g in itertools.groupby(
+                        value[1:],
+                        lambda x: x["last_changed"][0:13],
+                ):
+                    resultList[key][k] = list(g)[0]["state"]
+
+            _LOGGER.info("Zipped to %s", resultList)
+
+            return resultList
 
     async def handle_retrieve(call: ServiceCall) -> ServiceResponse:
         entity_ids = call.data["entity_ids"]
