@@ -123,7 +123,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         window = call.data.get("window", 25)
         _LOGGER.info("Window: %s", window)
 
-        selector = call.data.get("selector", 25)
+        selector = call.data.get("selector", "first")
         _LOGGER.info("Selector: %s", selector)
 
         return await get_instance(hass).async_add_executor_job(
