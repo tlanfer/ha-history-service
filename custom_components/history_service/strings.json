@@ -15,6 +15,14 @@
         "end_time": {
           "name": "End time",
           "description": "End of the historic period to retrieve"
+        },
+        "window": {
+          "name": "Aggregate by",
+          "description": "Aggregate data by time windows"
+        },
+        "selector": {
+          "name": "Aggregation selector",
+          "description": "Which value to use for each aggregated window (defaults to first)"
         }
       }
     }

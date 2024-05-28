@@ -1,7 +1,7 @@
 {
   "domain": "history_service",
   "name": "History Service",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "codeowners": ["@tlanfer"],
   "config_flow": true,
   "dependencies": [ "recorder" ],

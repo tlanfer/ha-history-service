@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 import datetime
+import enum
 import itertools
 import logging
 
@@ -28,6 +29,14 @@ PLATFORMS: list[Platform] = []
 _LOGGER = logging.getLogger(__name__)
 
 
+class Window(enum.Enum):
+    """Different windows for aggregations."""
+
+    DAY = 10
+    HOUR = 13
+    MINUTE = 16
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up entry."""
 
@@ -48,7 +57,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the integration."""
 
-    def get_history_data(start_time, end_time, entity_ids):
+    def get_history_data(start_time, end_time, entity_ids, windowSize, selector):
         with session_scope(hass=hass, read_only=True) as session:
             data = history.get_significant_states_with_session(
                 hass=hass,
@@ -64,17 +73,35 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 significant_changes_only=True,
             )
 
-            resultList = defaultdict()
+            resultList = {}
 
             for key, value in data.items():
-                resultList[key] = defaultdict()
-                for k, g in itertools.groupby(
-                        value[1:],
-                        lambda x: x["last_changed"][0:13],
+                resultList[key] = []
+                for _k, g in itertools.groupby(
+                    value[1:],
+                    lambda x, windowSize=windowSize: x["last_changed"][
+                        0 : int(windowSize)
+                    ],
                 ):
-                    resultList[key][k] = list(g)[0]["state"]
+                    match selector:
+                        case "max":
+                            item = max(g, key=lambda x: x["state"])
+                        case "min":
+                            item = min(g, key=lambda x: x["state"])
+                        case "first":
+                            item = list(g)[0]
+                        case "last":
+                            item = list(g)[-1]
 
-            _LOGGER.info("Zipped to %s", resultList)
+                    windowName = datetime.datetime.fromisoformat(
+                        item["last_changed"][0:windowSize]
+                    ).astimezone()
+                    resultList[key].append(
+                        {
+                            "last_updated": windowName,
+                            "state": item["state"],
+                        }
+                    )
 
             return resultList
 
@@ -93,11 +120,14 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         if start_time > end_time:
             raise "start_time must be before end_time"
 
+        window = call.data.get("window", 25)
+        _LOGGER.info("Window: %s", window)
+
+        selector = call.data.get("selector", 25)
+        _LOGGER.info("Selector: %s", selector)
+
         return await get_instance(hass).async_add_executor_job(
-            get_history_data,
-            start_time,
-            end_time,
-            entity_ids,
+            get_history_data, start_time, end_time, entity_ids, window.value, selector
         )
 
     hass.data.setdefault(DOMAIN, {})
@@ -112,6 +142,8 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 vol.Required("entity_ids"): cv.entity_ids,
                 vol.Optional("start_time"): cv.datetime,
                 vol.Optional("end_time"): cv.datetime,
+                vol.Optional("window"): vol.Coerce(Window),
+                vol.Optional("selector"): cv.string,
             }
         ),
     )
