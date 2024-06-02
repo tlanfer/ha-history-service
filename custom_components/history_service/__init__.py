@@ -76,9 +76,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             resultList = {}
 
             for key, value in data.items():
+                originalList = [i for i in value[1:] if i.isnumberic()]
                 resultList[key] = []
                 for _k, g in itertools.groupby(
-                    value[1:],
+                    originalList,
                     lambda x, windowSize=windowSize: x["last_changed"][
                         0 : int(windowSize)
                     ],
