@@ -57,7 +57,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the integration."""
 
-    def get_history_data(start_time, end_time, entity_ids, windowSize, selector):
+    def get_history_data(start_time, end_time, entity_ids, window_size, selector):
         with session_scope(hass=hass, read_only=True) as session:
             data = history.get_significant_states_with_session(
                 hass=hass,
@@ -76,12 +76,12 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             resultList = {}
 
             for key, value in data.items():
-                originalList = [i for i in value[1:] if i.isnumberic()]
+                originalList = [i for i in value[1:] if i["state"] != "unavailable"]
                 resultList[key] = []
                 for _k, g in itertools.groupby(
                     originalList,
-                    lambda x, windowSize=windowSize: x["last_changed"][
-                        0 : int(windowSize)
+                    lambda x, window_size=window_size: x["last_changed"][
+                        0 : int(window_size)
                     ],
                 ):
                     match selector:
@@ -95,7 +95,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                             item = list(g)[-1]
 
                     windowName = datetime.datetime.fromisoformat(
-                        item["last_changed"][0:windowSize]
+                        item["last_changed"][0:window_size]
                     ).astimezone()
                     resultList[key].append(
                         {
