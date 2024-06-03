@@ -1,5 +1,5 @@
 {
   "services": {
-    "retrieve": "mdi:image-search"
+    "get_history": "mdi:image-search"
   }
 }
