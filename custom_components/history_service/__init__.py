@@ -1,12 +1,11 @@
 """The history access service."""
 
-from collections import defaultdict
-import datetime
+from datetime import datetime as dt, timedelta
 import enum
-import itertools
 import logging
 
 import voluptuous as vol
+from typing import Any, cast
 
 from homeassistant.components.recorder import get_instance, history
 from homeassistant.components.recorder.util import session_scope
@@ -18,6 +17,7 @@ from homeassistant.core import (
     ServiceCall,
     ServiceResponse,
     SupportsResponse,
+    State,
 )
 from homeassistant.helpers import config_validation as cv
 import homeassistant.util.dt as dt_util
@@ -28,6 +28,7 @@ PLATFORMS: list[Platform] = []
 
 _LOGGER = logging.getLogger(__name__)
 
+_ONE_DAY = timedelta(days=1)
 
 class Window(enum.Enum):
     """Different windows for aggregations."""
@@ -57,9 +58,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the integration."""
 
-    def get_history_data(start_time, end_time, entity_ids, window_size, selector):
+    def get_history_job(
+        entity_ids: list[str],
+        start_time: dt,
+        end_time: dt,
+    ) -> dict[str, list[State | dict[str, Any]]]:
         with session_scope(hass=hass, read_only=True) as session:
-            data = history.get_significant_states_with_session(
+            return history.get_significant_states_with_session(
                 hass=hass,
                 session=session,
                 start_time=start_time,
@@ -73,80 +78,39 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
                 significant_changes_only=True,
             )
 
-            resultList = {}
-
-            for key, value in data.items():
-                originalList = [i for i in value[1:] if i["state"] != "unavailable"]
-                resultList[key] = []
-                for _k, g in itertools.groupby(
-                    originalList,
-                    lambda x, window_size=window_size: x["last_changed"][
-                        0 : int(window_size)
-                    ],
-                ):
-                    match selector:
-                        case "max":
-                            item = max(g, key=lambda x: x["state"])
-                        case "min":
-                            item = min(g, key=lambda x: x["state"])
-                        case "first":
-                            item = list(g)[0]
-                        case "last":
-                            item = list(g)[-1]
-
-                    windowName = datetime.datetime.fromisoformat(
-                        item["last_changed"][0:window_size]
-                    ).astimezone()
-                    resultList[key].append(
-                        {
-                            "last_updated": windowName,
-                            "state": item["state"],
-                        }
-                    )
-
-            return resultList
-
-    async def handle_retrieve(call: ServiceCall) -> ServiceResponse:
+    async def get_history_handler(call: ServiceCall) -> ServiceResponse:
         entity_ids = call.data["entity_ids"]
 
         end_time = dt_util.utcnow()
-        start_time = end_time - datetime.timedelta(hours=1)
-
-        if "start_time" in call.data:
-            start_time = call.data["start_time"].astimezone()
-
         if "end_time" in call.data:
             end_time = call.data["end_time"].astimezone()
 
-        if start_time > end_time:
-            raise "start_time must be before end_time"
+        start_time = end_time - _ONE_DAY
+        if "start_time" in call.data:
+            start_time = call.data["start_time"].astimezone()
 
-        window = call.data.get("window", 25)
-        _LOGGER.info("Window: %s", window)
-
-        selector = call.data.get("selector", "first")
-        _LOGGER.info("Selector: %s", selector)
-
-        return await get_instance(hass).async_add_executor_job(
-            get_history_data, start_time, end_time, entity_ids, window.value, selector
+        return cast(
+            ServiceResponse,
+            await get_instance(hass).async_add_executor_job(
+                get_history_job, entity_ids, start_time, end_time
+            ),
         )
 
     hass.data.setdefault(DOMAIN, {})
 
     hass.services.async_register(
         DOMAIN,
-        "retrieve",
-        handle_retrieve,
+        "get_history",
+        get_history_handler,
         supports_response=SupportsResponse.ONLY,
         schema=vol.Schema(
             {
                 vol.Required("entity_ids"): cv.entity_ids,
                 vol.Optional("start_time"): cv.datetime,
                 vol.Optional("end_time"): cv.datetime,
-                vol.Optional("window"): vol.Coerce(Window),
-                vol.Optional("selector"): cv.string,
             }
         ),
     )
+
 
     return True

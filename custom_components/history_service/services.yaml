@@ -1,37 +1,13 @@
-retrieve:
+get_history:
   fields:
     entity_ids:
+      required: true
       selector:
         entity:
-          multiple: True
+          multiple: true
     start_time:
       selector:
         datetime:
     end_time:
       selector:
         datetime:
-    window:
-      selector:
-        select:
-          mode: dropdown
-          options:
-            - label: Day
-              value: 10
-            - label: Hour
-              value: 13
-            - label: Minute
-              value: 16
-
-    selector:
-      selector:
-        select:
-          mode: dropdown
-          options:
-            - label: First
-              value: first
-            - label: Last
-              value: last
-            - label: Min
-              value: min
-            - label: Max
-              value: max

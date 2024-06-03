@@ -1,28 +1,20 @@
 {
   "services": {
-    "retrieve": {
-      "name": "Retrieve History",
+    "get_history": {
+      "name": "Get History",
       "description": "Get history for an entity",
       "fields": {
         "entity_ids": {
           "name": "Entities",
-          "description": "The entities to get historic data for"
+          "description": "The entities to get historic data for."
         },
         "start_time": {
           "name": "Start time",
-          "description": "Start of the historic period to retrieve"
+          "description": "Start of the historic period to retrieve. Defaults to one day before end time."
         },
         "end_time": {
           "name": "End time",
-          "description": "End of the historic period to retrieve"
-        },
-        "window": {
-          "name": "Aggregate by",
-          "description": "Aggregate data by time windows"
-        },
-        "selector": {
-          "name": "Aggregation selector",
-          "description": "Which value to use for each aggregated window (defaults to first)"
+          "description": "End of the historic period to retrieve. Defaults to now."
         }
       }
     }
